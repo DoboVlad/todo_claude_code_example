@@ -26,7 +26,7 @@ We are building a **modern, production-ready personal TODO application** consist
 - An **Angular 21** single-page frontend using Angular Material, standalone components, and Signals.
 - A **NestJS** REST backend with a deliberately simple module structure.
 - A **SQLite** database accessed through **Prisma**.
-- **Google OAuth 2.0** login with **JWT access tokens** and a **refresh-token rotation** strategy.
+- **Email/password** registration and login with **JWT access tokens** and a **refresh-token rotation** strategy.
 
 ### Goals
 
@@ -54,14 +54,14 @@ We are building a **modern, production-ready personal TODO application** consist
 │   - Signals store         │ ◀───────────────────────────  │   - Users module          │
 │   - Route guards          │   HTTP-only refresh cookie    │   - Todos module          │
 └──────────────────────────┘                                │   - Prisma service        │
-            │                                                └────────────┬─────────────┘
-            │  Google OAuth redirect                                      │ Prisma
-            ▼                                                             ▼
-   ┌──────────────────┐                                         ┌──────────────────┐
-   │  Google Identity │                                         │  SQLite (file)   │
-   └──────────────────┘                                         │  on persistent   │
-                                                                │  disk            │
-                                                                └──────────────────┘
+                                                            └────────────┬─────────────┘
+                                                                         │ Prisma
+                                                                         ▼
+                                                               ┌──────────────────┐
+                                                               │  SQLite (file)   │
+                                                               │  on persistent   │
+                                                               │  disk            │
+                                                               └──────────────────┘
 ```
 
 ---
@@ -159,7 +159,7 @@ These are **Architecture Decision Records (ADRs)** in condensed form. Each state
 | ORM | Prisma | See ADR-3 |
 | Validation | `class-validator` + `class-transformer` via global `ValidationPipe` | Declarative DTO validation |
 | Config | `@nestjs/config` (env-based) | Typed, validated env vars |
-| Auth | Passport (`passport-google-oauth20`, `passport-jwt`) + `@nestjs/jwt` | Battle-tested OAuth + JWT |
+| Auth | Passport (`passport-local`, `passport-jwt`) + `@nestjs/jwt` + `bcrypt` | Email/password login with JWT + secure refresh-token rotation |
 | Docs (optional) | `@nestjs/swagger` | Auto API docs in dev |
 
 ### Database
@@ -235,7 +235,8 @@ frontend/
 │   │   │
 │   │   ├── features/                 # lazy-loaded feature areas
 │   │   │   ├── auth/
-│   │   │   │   ├── login/                      # Login page + Google button
+│   │   │   │   ├── login/                      # Login page (email + password form)
+│   │   │   │   ├── register/                   # Register page (email + password + displayName)
 │   │   │   │   └── auth.routes.ts
 │   │   │   ├── dashboard/
 │   │   │   │   ├── dashboard.component.ts
@@ -301,22 +302,23 @@ backend/
 │   │
 │   ├── auth/
 │   │   ├── auth.module.ts
-│   │   ├── auth.controller.ts    # /auth/google, /auth/google/callback, /auth/refresh, /auth/logout, /auth/me
-│   │   ├── auth.service.ts       # token issuing, refresh rotation
+│   │   ├── auth.controller.ts    # /auth/register, /auth/login, /auth/refresh, /auth/logout, /auth/me
+│   │   ├── auth.service.ts       # register, validateUser, login, refresh, logout, sanitize
 │   │   ├── strategies/
-│   │   │   ├── google.strategy.ts
-│   │   │   └── jwt.strategy.ts
+│   │   │   ├── local.strategy.ts  # passport-local (email + bcrypt password)
+│   │   │   └── jwt.strategy.ts    # passport-jwt (Bearer token)
 │   │   ├── guards/
 │   │   │   ├── jwt-auth.guard.ts
-│   │   │   └── google-auth.guard.ts
+│   │   │   └── local-auth.guard.ts
 │   │   ├── decorators/
 │   │   │   └── current-user.decorator.ts
 │   │   └── dto/
+│   │       ├── register.dto.ts
+│   │       └── login.dto.ts
 │   │
 │   ├── users/
 │   │   ├── users.module.ts
-│   │   ├── users.service.ts      # find/create from Google profile
-│   │   └── dto/
+│   │   └── users.service.ts      # findById, findByEmail, create
 │   │
 │   ├── todos/
 │   │   ├── todos.module.ts
@@ -351,26 +353,27 @@ backend/
 | Access (JWT) | ~15 min | **In-memory signal** in SPA | Authorize API calls via `Authorization: Bearer` |
 | Refresh | ~7 days | **HTTP-only, Secure, SameSite cookie** | Obtain new access tokens silently |
 
-### Authentication flow (Google OAuth + JWT)
+### Authentication flow (email/password + JWT)
 
 ```
-1. User clicks "Login with Google" → SPA redirects to  GET /auth/google
-2. NestJS (GoogleStrategy) redirects to Google consent screen
-3. Google redirects back to  GET /auth/google/callback?code=...
-4. Backend validates profile, upserts User, then:
-     - issues access JWT  (returned to SPA)
-     - issues refresh JWT (stored hashed in DB; set as HTTP-only cookie)
-     - redirects SPA to a callback route carrying the access token
-5. SPA stores access token in memory; user is authenticated
-6. On 401 / near-expiry → SPA calls  POST /auth/refresh  (cookie sent automatically)
-     - backend verifies refresh token against DB hash, ROTATES it (new refresh + revoke old)
-     - returns new access token
-7. Logout → POST /auth/logout  → backend revokes refresh token + clears cookie
+1. New user → POST /auth/register  { email, password, displayName }
+     - backend hashes password (bcrypt, 12 rounds), creates User
+     - issues access JWT (returned in response body)
+     - issues opaque refresh token (SHA-256 hashed before DB storage; set as HTTP-only cookie)
+2. Returning user → POST /auth/login  { email, password }
+     - backend validates password with bcrypt.compare
+     - same token issuance as above
+3. SPA stores access token in memory; user is authenticated
+4. On 401 / near-expiry → SPA calls  POST /auth/refresh  (cookie sent automatically)
+     - backend looks up refresh token by SHA-256 hash, checks not revoked/expired
+     - ROTATES: revokes old token, issues new access + refresh token pair
+     - returns new access token in body, new refresh token in cookie
+5. Logout → POST /auth/logout  → backend revokes refresh token + clears cookie
 ```
 
 ### Refresh-token rotation
 
-- Refresh tokens are **hashed (argon2/bcrypt) before storage** in a `RefreshToken` table — never stored in plaintext.
+- Refresh tokens are **SHA-256 hashed before storage** in a `RefreshToken` table — never stored in plaintext.
 - Each refresh **rotates**: the old token is revoked and a new one issued. Reuse of a revoked token → treat as compromise, revoke the whole session family.
 - Tokens carry an expiry; expired/revoked tokens are rejected.
 
@@ -402,13 +405,9 @@ backend/
 
 ```
 DATABASE_URL="file:./dev.db"
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback
-JWT_ACCESS_SECRET=...
-JWT_ACCESS_TTL=15m
-JWT_REFRESH_SECRET=...
-JWT_REFRESH_TTL=7d
+JWT_ACCESS_SECRET=...          # required — generate with crypto.randomBytes(64).toString('hex')
+JWT_ACCESS_TTL=15m             # optional, default 15m
+JWT_REFRESH_TTL=7d             # optional, default 7d
 FRONTEND_URL=http://localhost:4200
 COOKIE_DOMAIN=localhost
 NODE_ENV=development
@@ -514,27 +513,29 @@ Complexity scale: **S** (small) · **M** (medium) · **L** (large).
 - **Complexity:** M
 - **Dependencies:** Phase 1.
 
-### Phase 3 — Authentication
-
-- **Goals:** Working Google OAuth login issuing access + refresh tokens.
-- **Tasks:**
-  - Google + JWT Passport strategies; guards; `@CurrentUser` decorator.
-  - `/auth/google`, `/auth/google/callback`, `/auth/refresh`, `/auth/logout`, `/auth/me`.
-  - Refresh-token rotation with hashed storage; HTTP-only cookie handling.
-- **Deliverables:** End-to-end login from a test client; refresh and logout work; protected route returns user.
-- **Complexity:** L
-- **Dependencies:** Phase 2, Phase 4 (User + RefreshToken tables).
-
-### Phase 4 — Database
+### Phase 3 — Database ✅
 
 - **Goals:** Data model and migrations via Prisma + SQLite.
 - **Tasks:**
-  - `schema.prisma` with `User`, `Todo`, `RefreshToken` models and relations.
+  - `schema.prisma` with `User` (`email`, `passwordHash`), `Todo`, `RefreshToken` models and relations.
   - `PrismaService` (global), connect on init.
   - First migration; optional seed.
 - **Deliverables:** SQLite file created via migration; typed Prisma client generated; Prisma Studio inspectable.
 - **Complexity:** S–M
-- **Dependencies:** Phase 2. (Run before/with Phase 3 since auth needs User/RefreshToken.)
+- **Dependencies:** Phase 2.
+
+### Phase 4 — Authentication ✅
+
+- **Goals:** Working email/password registration and login issuing access + refresh tokens.
+- **Tasks:**
+  - `UsersModule` + `UsersService` (find by id/email, create).
+  - `LocalStrategy` (passport-local, validates email+password via bcrypt) + `LocalAuthGuard`.
+  - `JwtStrategy` (passport-jwt, Bearer token) + `JwtAuthGuard` + `@CurrentUser` decorator.
+  - `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`.
+  - Refresh-token rotation with SHA-256 hashed storage; HTTP-only cookie handling.
+- **Deliverables:** End-to-end register/login from a test client; refresh and logout work; protected route returns user.
+- **Complexity:** L
+- **Dependencies:** Phase 3.
 
 ### Phase 5 — TODO CRUD
 
@@ -641,22 +642,22 @@ Each step is intentionally small and independently executable in a future prompt
 13. Configure `main.ts`: CORS (credentials, frontend origin), `cookie-parser`, `helmet`, `@nestjs/throttler`.
 14. Add a `GET /health` endpoint.
 
-### Phase 3 — Database (run before auth service work)
-15. Add Prisma; create `schema.prisma` with `User` model.
+### Phase 3 — Database ✅ (complete)
+15. Add Prisma; create `schema.prisma` with `User` model (`email`, `passwordHash`).
 16. Add `Todo` model and relation to `User`.
-17. Add `RefreshToken` model (hashed token, expiry, revoked flag, relation to `User`).
+17. Add `RefreshToken` model (SHA-256 hashed token, expiry, revoked flag, relation to `User`).
 18. Create the `PrismaModule` + `PrismaService` (global, connect on init).
 19. Generate the first migration and the Prisma client.
 
-### Phase 4 — Authentication
-20. Create the `UsersModule` + `UsersService` (find-or-create from Google profile).
-21. Add `passport-google-oauth20` `GoogleStrategy` and `GoogleAuthGuard`.
-22. Implement `GET /auth/google` and `GET /auth/google/callback`.
-23. Add `AuthService` access-token issuance with `@nestjs/jwt`.
-24. Add refresh-token issuance: hash + persist in `RefreshToken`, set HTTP-only cookie.
-25. Add `passport-jwt` `JwtStrategy` + `JwtAuthGuard` + `@CurrentUser` decorator.
-26. Implement `POST /auth/refresh` with rotation (verify, revoke old, issue new).
-27. Implement `POST /auth/logout` (revoke + clear cookie) and `GET /auth/me`.
+### Phase 4 — Authentication ✅ (complete)
+20. Create the `UsersModule` + `UsersService` (`findById`, `findByEmail`, `create`).
+21. Add `passport-local` `LocalStrategy` (validates email + bcrypt password) and `LocalAuthGuard`.
+22. Add `passport-jwt` `JwtStrategy` + `JwtAuthGuard` + `@CurrentUser` decorator.
+23. Create `RegisterDto` and `LoginDto` with `class-validator` decorators.
+24. Add `AuthService`: `register` (hash password, create user), `validateUser`, `login`, `refresh`, `logout`, `sanitize`.
+25. Refresh-token issuance: random 40-byte opaque token, SHA-256 hashed before DB storage, set HTTP-only cookie.
+26. Implement `POST /auth/refresh` with rotation (verify hash, revoke old, issue new pair).
+27. Implement `POST /auth/register`, `POST /auth/login`, `POST /auth/logout` (revoke + clear cookie), `GET /auth/me`.
 
 ### Phase 5 — TODO CRUD
 28. Create `CreateTodoDto` and `UpdateTodoDto` with `class-validator` decorators.
@@ -669,14 +670,14 @@ Each step is intentionally small and independently executable in a future prompt
 33. Add Angular Material + CDK; configure the theme system with light/dark tokens in `styles/`.
 34. Build the `MainLayout` shell: Material toolbar (title, profile, logout) + `<router-outlet>`.
 35. Add the collapsible Material sidenav with nav items (Dashboard, All/Active/Completed) and CDK `BreakpointObserver` responsiveness.
-36. Build the Login page with the "Login with Google" button.
+36. Build the Login and Register pages (Reactive Forms: email, password, displayName on register).
 37. Create shared UI components: `confirm-dialog`, `empty-state`, `loading-spinner`, `page-header`.
 38. Build `todo-list` and `todo-item` components (Material cards/table).
 39. Build the `todo-form-dialog` for create/edit (Reactive Forms + Material dialog).
 40. Build Dashboard, All Tasks, Active Tasks, Completed Tasks pages with OnPush and deferrable views where appropriate.
 
 ### Phase 7 — State Management
-41. Implement `AuthService` signals (`user`, `accessToken`, `isAuthenticated`) and login/logout flow handling the OAuth callback.
+41. Implement `AuthService` signals (`user`, `accessToken`, `isAuthenticated`) and register/login/logout flow.
 42. Implement the functional auth interceptor (attach Bearer; on 401 call `/auth/refresh` then retry).
 43. Implement `TodosService` (HTTP) and `TodosStore` (signals + computed filtered views).
 44. Wire the `authGuard` and configure top-level lazy routes (`loadComponent`/`loadChildren`).
@@ -695,7 +696,7 @@ Each step is intentionally small and independently executable in a future prompt
 ### Phase 10 — Deployment
 52. Create the Render Static Site for `frontend/` (build + publish dir, auto-deploy on `main`).
 53. Create the Render Web Service for `backend/` with a Persistent Disk and `DATABASE_URL` pointing to it.
-54. Configure production env vars/secrets and production Google OAuth credentials + callback URL.
+54. Configure production env vars/secrets (`DATABASE_URL`, `JWT_ACCESS_SECRET`, `FRONTEND_URL`, etc.).
 55. Set the backend release command to run `prisma migrate deploy`; add `deploy.yml`.
 56. Add a scheduled SQLite backup job; smoke-test production login and full CRUD.
 

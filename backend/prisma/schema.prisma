@@ -9,8 +9,8 @@ datasource db {
 
 model User {
   id            String         @id @default(cuid())
-  googleId      String         @unique
   email         String         @unique
+  passwordHash  String
   displayName   String
   avatar        String?
   createdAt     DateTime       @default(now())

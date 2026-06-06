@@ -20,27 +20,13 @@ class EnvironmentVariables {
   @IsString()
   DATABASE_URL: string;
 
-  // Required — Google OAuth secrets
-  @IsString()
-  GOOGLE_CLIENT_ID: string;
-
-  @IsString()
-  GOOGLE_CLIENT_SECRET: string;
-
-  @IsOptional()
-  @IsString()
-  GOOGLE_CALLBACK_URL: string = 'http://localhost:3000/auth/google/callback';
-
-  // Required — JWT signing secrets
+  // Required — JWT signing secret for access tokens
   @IsString()
   JWT_ACCESS_SECRET: string;
 
   @IsOptional()
   @IsString()
   JWT_ACCESS_TTL: string = '15m';
-
-  @IsString()
-  JWT_REFRESH_SECRET: string;
 
   @IsOptional()
   @IsString()
