@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import configuration from './config/configuration';
+import { TodosModule } from './todos/todos.module';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -23,6 +24,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ]),
     PrismaModule,
     AuthModule,
+    TodosModule,
   ],
   controllers: [AppController],
   providers: [
