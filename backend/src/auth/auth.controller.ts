@@ -29,12 +29,8 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  async register(
-    @Body() dto: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { user, accessToken, refreshToken } =
-      await this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+    const { user, accessToken, refreshToken } = await this.authService.register(dto);
     this.setRefreshCookie(res, refreshToken);
     return { user, accessToken };
   }
@@ -42,23 +38,15 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(
-    @Req() req: Request & { user: User },
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { user, accessToken, refreshToken } = await this.authService.login(
-      req.user,
-    );
+  async login(@Req() req: Request & { user: User }, @Res({ passthrough: true }) res: Response) {
+    const { user, accessToken, refreshToken } = await this.authService.login(req.user);
     this.setRefreshCookie(res, refreshToken);
     return { user, accessToken };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req.cookies as Record<string, string>)[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('No refresh token');
     const { accessToken, refreshToken } = await this.authService.refresh(token);
