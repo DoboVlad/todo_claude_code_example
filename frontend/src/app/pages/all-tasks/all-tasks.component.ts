@@ -1,29 +1,20 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { TodosStore } from '../../core/todos/todos.store';
-import { LoadingSpinnerComponent } from '../../shared/loading-spinner/loading-spinner.component';
-import { TodoListComponent } from '../../todos/todo-list/todo-list.component';
+import { TaskPageShellComponent } from '../../shared/task-page-shell/task-page-shell.component';
 
 @Component({
   selector: 'app-all-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LoadingSpinnerComponent, TodoListComponent],
+  imports: [TaskPageShellComponent],
   template: `
-    <h1 class="page-title">All Tasks</h1>
-    @if (store.loading()) {
-      <app-loading-spinner />
-    } @else {
-      <app-todo-list [todos]="store.todos()" emptyMessage="No tasks yet" />
-    }
+    <app-task-page-shell
+      title="All Tasks"
+      [todos]="store.todos()"
+      emptyMessage="No tasks yet"
+      [loading]="store.loading()"
+    />
   `,
-  styles: [
-    `
-      .page-title {
-        margin: 0 0 16px;
-        font-size: 1.5rem;
-      }
-    `,
-  ],
 })
 export class AllTasksComponent implements OnInit {
   readonly store = inject(TodosStore);
