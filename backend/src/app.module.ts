@@ -18,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
     }),
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: 60_000,
         limit: 100,
       },

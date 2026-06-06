@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/unbound-method */
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -165,6 +167,7 @@ export class RegisterComponent {
       next: () => void this.router.navigate(['/dashboard']),
       error: (err) => {
         this.loading.set(false);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         this.errorMsg.set(err?.error?.message ?? 'Registration failed. Please try again.');
       },
     });

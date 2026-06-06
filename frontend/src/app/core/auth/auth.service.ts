@@ -66,7 +66,9 @@ export class AuthService {
           localStorage.setItem('access_token', res.accessToken);
         }),
         map((res) => res.accessToken),
-        finalize(() => { this._refreshInFlight = null; }),
+        finalize(() => {
+          this._refreshInFlight = null;
+        }),
         shareReplay(1),
       );
 

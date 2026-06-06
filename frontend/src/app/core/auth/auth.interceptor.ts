@@ -13,12 +13,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const isRefreshReq = req.url.includes('/auth/refresh');
 
   const authedReq =
-    token && !isRefreshReq
-      ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
-      : req;
+    token && !isRefreshReq ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
 
   return next(authedReq).pipe(
-    catchError((err) => {
+    catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse && err.status === 401 && !isRefreshReq) {
         return auth.refresh().pipe(
           switchMap((newToken) =>

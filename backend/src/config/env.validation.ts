@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, MinLength, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -20,8 +20,9 @@ class EnvironmentVariables {
   @IsString()
   DATABASE_URL: string;
 
-  // Required — JWT signing secret for access tokens
+  // Required — JWT signing secret; minimum 32 chars (generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
   @IsString()
+  @MinLength(32)
   JWT_ACCESS_SECRET: string;
 
   @IsOptional()

@@ -13,10 +13,7 @@ import { TodoListComponent } from '../../todos/todo-list/todo-list.component';
     @if (store.loading()) {
       <app-loading-spinner />
     } @else {
-      <app-todo-list
-        [todos]="store.completedTodos()"
-        emptyMessage="No completed tasks yet"
-      />
+      <app-todo-list [todos]="store.completedTodos()" emptyMessage="No completed tasks yet" />
     }
   `,
   styles: [

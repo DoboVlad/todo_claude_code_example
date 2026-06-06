@@ -31,9 +31,7 @@ export const routes: Routes = [
       {
         path: 'todos/active',
         loadComponent: () =>
-          import('./pages/active-tasks/active-tasks.component').then(
-            (m) => m.ActiveTasksComponent,
-          ),
+          import('./pages/active-tasks/active-tasks.component').then((m) => m.ActiveTasksComponent),
       },
       {
         path: 'todos/completed',

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -130,8 +131,14 @@ export class LoginComponent {
   readonly showPw = signal(false);
 
   readonly form = new FormGroup({
-    email: new FormControl('', { validators: [Validators.required, Validators.email], nonNullable: true }),
-    password: new FormControl('', { validators: [Validators.required], nonNullable: true }),
+    email: new FormControl('', {
+      validators: [(c) => Validators.required(c), (c) => Validators.email(c)],
+      nonNullable: true,
+    }),
+    password: new FormControl('', {
+      validators: [(c) => Validators.required(c)],
+      nonNullable: true,
+    }),
   });
 
   submit(): void {
@@ -141,9 +148,13 @@ export class LoginComponent {
     const { email, password } = this.form.getRawValue();
     this.auth.login(email, password).subscribe({
       next: () => void this.router.navigate(['/dashboard']),
-      error: (err) => {
+      error: (err: unknown) => {
         this.loading.set(false);
-        this.errorMsg.set(err?.error?.message ?? 'Login failed. Please try again.');
+        const message =
+          err instanceof HttpErrorResponse
+            ? ((err.error as { message?: string }).message ?? 'Login failed. Please try again.')
+            : 'Login failed. Please try again.';
+        this.errorMsg.set(message);
       },
     });
   }

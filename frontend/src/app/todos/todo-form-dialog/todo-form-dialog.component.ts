@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,19 +15,20 @@ export interface TodoFormDialogData {
   selector: 'app-todo-form-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  imports: [
+    ReactiveFormsModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+  ],
   template: `
     <h2 mat-dialog-title>{{ data.todo ? 'Edit Task' : 'New Task' }}</h2>
     <mat-dialog-content>
       <form [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Task title</mat-label>
-          <input
-            matInput
-            formControlName="title"
-            placeholder="What needs to be done?"
-            autofocus
-          />
+          <input matInput formControlName="title" placeholder="What needs to be done?" />
           @if (form.get('title')?.hasError('required')) {
             <mat-error>Title is required</mat-error>
           }

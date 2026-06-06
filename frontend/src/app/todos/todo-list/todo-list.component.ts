@@ -54,10 +54,7 @@ import {
               [checked]="todo.completed"
               (change)="store.toggle(todo)"
             />
-            <span
-              matListItemTitle
-              [class.completed-title]="todo.completed"
-            >{{ todo.title }}</span>
+            <span matListItemTitle [class.completed-title]="todo.completed">{{ todo.title }}</span>
             <div matListItemMeta class="item-actions">
               <button mat-icon-button matTooltip="Edit" (click)="openEdit(todo)">
                 <mat-icon>edit</mat-icon>

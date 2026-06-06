@@ -12,7 +12,14 @@ import { TodoListComponent } from '../../todos/todo-list/todo-list.component';
   selector: 'app-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, LoadingSpinnerComponent, TodoListComponent],
+  imports: [
+    RouterLink,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    LoadingSpinnerComponent,
+    TodoListComponent,
+  ],
   template: `
     <h1 class="page-title">
       Good {{ greeting }}, {{ auth.currentUser()?.displayName ?? 'there' }}!
@@ -84,9 +91,15 @@ import { TodoListComponent } from '../../todos/todo-list/todo-list.component';
         height: 36px;
         margin-bottom: 8px;
       }
-      .total-icon { color: #1976d2; }
-      .active-icon { color: #f57c00; }
-      .done-icon { color: #388e3c; }
+      .total-icon {
+        color: #1976d2;
+      }
+      .active-icon {
+        color: #f57c00;
+      }
+      .done-icon {
+        color: #388e3c;
+      }
       .stat-value {
         font-size: 2rem;
         font-weight: 700;
@@ -107,7 +120,9 @@ import { TodoListComponent } from '../../todos/todo-list/todo-list.component';
         margin: 0;
       }
       @media (max-width: 600px) {
-        .stats-row { grid-template-columns: 1fr; }
+        .stats-row {
+          grid-template-columns: 1fr;
+        }
       }
     `,
   ],
